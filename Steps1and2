@@ -1,0 +1,68 @@
+#load libraries
+library(RCurl)
+library(dplyr)
+library(ggplot2)
+
+#load each data set
+n2005 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2005_AWARD.csv")
+n2006 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2006_AWARD.csv")
+n2007 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2007_AWARD.csv")
+n2008 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2008_AWARD.csv")
+n2009 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2009_AWARD.csv")
+n2010 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2010_AWARD.csv")
+n2011 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2011_AWARD.csv")
+n2012 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2012_AWARD.csv")
+n2013 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2013_AWARD.csv")
+n2014 <- getURL("http://www.nserc-crsng.gc.ca/opendata/NSERC_GRT_FYR2014_AWARD.csv")
+
+#read csv and set NA values
+n2005NA <- read.csv(text = n2005, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2006NA <- read.csv(text = n2006, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2007NA <- read.csv(text = n2007, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2008NA <- read.csv(text = n2008, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2009NA <- read.csv(text = n2009, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2010NA <- read.csv(text = n2010, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2011NA <- read.csv(text = n2011, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2012NA <- read.csv(text = n2012, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2013NA <- read.csv(text = n2013, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+n2014NA <- read.csv(text = n2014, header = TRUE, sep = ",", na.strings = c("No summary - Aucun sommaire", ""))
+
+#delete 2013 and 2014 extra fields to align data schema of all data sets
+n2013NA$Num_Partie <- NULL
+n2014NA$Num_Partie <- NULL
+
+#bind data sets
+totalNSERC <- bind_rows(n2005NA, n2006NA, n2007NA, n2008NA, n2009NA, n2010NA, n2011NA, n2012NA, n2013NA, n2014NA) 
+
+#select fields of interest
+NSERC_selected <- select(totalNSERC, Institution.Établissement, FiscalYear.Exercice.financier, AwardAmount, ApplicationSummary) 
+
+#check for NAs
+sum(is.na(NSERC_selected$Institution.Établissement) == TRUE)
+sum(is.na(NSERC_selected$FiscalYear.Exercice.financier) == TRUE)
+sum(is.na(NSERC_selected$AwardAmount) == TRUE)
+sum(is.na(NSERC_selected$ApplicationSummary) == TRUE)
+#there are only NA values in the "ApplicationSummary" field
+
+#filter NA values
+NSERC_selected_filtered <- na.omit(NSERC_selected)
+
+#save this file locally to prevent reloading large data from the web
+save(NSERC_selected_filtered, file = "NSERC.rdata")
+
+#load selected and filtered data from saved file if neccessary
+load("NSERC.rdata")
+
+#explore the data
+barplot(table(NSERC_selected_filtered$FiscalYear.Exercice.financier)) #number of summaries are increasing each year
+sum(as.numeric(NSERC_selected_filtered$AwardAmount)) #over 4.15 billion in funds
+summary(NSERC_selected_filtered$AwardAmount)
+sd(NSERC_selected_filtered$AwardAmount) #seems too high, check for outliers
+boxplot(NSERC_selected_filtered$AwardAmount)
+ggplot(NSERC_selected_filtered, aes(x = FiscalYear.Exercice.financier, y = AwardAmount )) + geom_point() #four extreme data points
+
+#bin the data
+q <- quantile(NSERC_selected_filtered$AwardAmount, c(0,1/3,2/3,1))
+q #returns 3 nicely numbered bins, consider small, medium, and large classifiers
+NSERC_with_bins <- data.frame(NSERC_selected_filtered, bin=cut(NSERC_selected_filtered$AwardAmount, q, include.lowest = TRUE))
+plot(table(NSERC_with_bins$bin))
